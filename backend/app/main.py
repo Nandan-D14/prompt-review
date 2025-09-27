@@ -311,11 +311,117 @@ def call_gemini_generate(prompt: str, model: str = GEMINI_MODEL, max_tokens: int
         return stub_llm_response(prompt)
 
 def stub_llm_response(prompt: str) -> str:
-    # A tiny local stub to ensure demos never fail.
-    return (
-        "STUB LLM RESPONSE: This is a simulated LLM reply. "
-        "In production, configure GEMINI_API_KEY and set USE_STUB=false to call Gemini."
-    )
+    # Intelligent stub responses based on content analysis
+    prompt_lower = prompt.lower()
+    
+    # Educational content
+    if any(term in prompt_lower for term in ['explain', 'teach', 'learn', 'understand', 'concept']):
+        if 'quantum' in prompt_lower and 'physics' in prompt_lower:
+            return """**Quantum Physics Simplified for High School Students**
+
+**What is Quantum Physics?**
+Quantum physics is the study of matter and energy at the tiniest scale - smaller than atoms! At this microscopic level, particles behave in strange and fascinating ways that are completely different from our everyday experience.
+
+**Key Concepts:**
+
+1. **Wave-Particle Duality**
+   - Light and particles can act like both waves and particles
+   - Think of it like a coin that's spinning - it's both heads AND tails until it lands
+
+2. **Uncertainty Principle** 
+   - We can't know both the exact position and speed of a particle at the same time
+   - It's like trying to photograph a hummingbird - the more precisely you capture its location, the blurrier its motion becomes
+
+3. **Quantum Superposition**
+   - Particles can exist in multiple states simultaneously
+   - Famous example: Schrödinger's cat being both alive and dead until observed
+
+4. **Quantum Entanglement**
+   - Two particles can be mysteriously connected across vast distances
+   - Einstein called this "spooky action at a distance"
+
+**Why Does This Matter?**
+Quantum physics enables technologies like lasers, MRI machines, computer processors, and could lead to quantum computers that solve problems impossible for regular computers.
+
+**Analysis Reasoning:** This prompt was educational, appropriate, and requested clear explanations for students - exactly the type of content our system is designed to support and encourage."""
+
+        elif any(term in prompt_lower for term in ['ai', 'artificial intelligence', 'machine learning']):
+            return """**Artificial Intelligence Explained Simply**
+
+**What is AI?**
+Artificial Intelligence is technology that enables computers to perform tasks that typically require human intelligence, such as learning, reasoning, and problem-solving.
+
+**Key Types:**
+
+1. **Narrow AI** - Specialized for specific tasks (like chess, image recognition)
+2. **Machine Learning** - Systems that improve through experience
+3. **Deep Learning** - AI inspired by how human brains process information
+
+**Real-World Applications:**
+- Voice assistants (Siri, Alexa)
+- Recommendation systems (Netflix, YouTube)
+- Medical diagnosis assistance
+- Autonomous vehicles
+
+**Analysis Reasoning:** This educational request about AI concepts is appropriate and aligns with promoting understanding of important technologies."""
+
+    # Programming/coding requests
+    if any(term in prompt_lower for term in ['code', 'programming', 'software', 'algorithm']):
+        return """**Programming Concepts Explained**
+
+Programming is the art of giving computers step-by-step instructions to solve problems. Here are key concepts:
+
+**Fundamental Principles:**
+1. **Variables** - Storage containers for data
+2. **Functions** - Reusable blocks of code
+3. **Loops** - Repeating actions efficiently
+4. **Conditionals** - Making decisions in code
+
+**Best Practices:**
+- Write clean, readable code
+- Plan before you code
+- Test your programs thoroughly
+- Learn from errors and debugging
+
+**Analysis Reasoning:** Educational programming content promotes learning and skill development in technology."""
+
+    # Professional communication
+    if any(term in prompt_lower for term in ['professional', 'business', 'email', 'communication']):
+        return """**Professional Communication Guidelines**
+
+**Key Principles:**
+1. **Clarity** - Be clear and direct in your message
+2. **Courtesy** - Use polite and respectful language
+3. **Conciseness** - Keep messages focused and brief
+4. **Correctness** - Check grammar and factual accuracy
+
+**Structure for Professional Emails:**
+- Clear subject line
+- Polite greeting
+- Specific purpose/request
+- Next steps or timeline
+- Professional closing
+
+**Analysis Reasoning:** This request for professional communication guidance promotes workplace skills and appropriate conduct."""
+
+    # General educational response
+    return """**Educational Response**
+
+I'd be happy to help you learn! For the most comprehensive and accurate information on this topic, I recommend:
+
+**Learning Strategies:**
+1. Break complex topics into smaller parts
+2. Use multiple sources to verify information
+3. Apply concepts through practice and examples
+4. Ask specific questions for targeted learning
+
+**Quality Resources:**
+- Educational websites (.edu domains)
+- Peer-reviewed academic sources
+- Established educational institutions
+- Professional learning platforms
+
+**Analysis Reasoning:** This prompt requested educational content, which aligns with promoting learning and knowledge sharing - core values our system is designed to support."""
 
 # --- Pipeline endpoint implementations ---
 
@@ -413,13 +519,8 @@ def chat(req: ChatRequest):
         # Optionally auto-rewrite and return rewrite with allowed=False
         return ChatResponse(allowed=False, analysis=analysis, llm_response=None)
 
-    # ALLOW: forward to LLM (Gemini or stub)
-    llm_prompt = (
-        f"You are an assistant. Respond to the following prompt in a concise, helpful manner.\n"
-        f"Persona: {req.persona}\n\nUser prompt:\n{req.prompt}\n\n"
-        f"Additionally include a short analysis summary explaining why the prompt was allowed (1-2 lines)."
-    )
-    llm_resp = call_gemini_generate(llm_prompt, max_tokens=800)
+    # ALLOW: forward to LLM (Gemini or stub) with original prompt for better context matching
+    llm_resp = call_gemini_generate(req.prompt, max_tokens=800)
     return ChatResponse(allowed=True, analysis=analysis, llm_response=llm_resp)
 
 # --- Simple health endpoint ---

@@ -130,14 +130,6 @@ export const RecommendedPrompts: React.FC<RecommendedPromptsProps> = ({ onPrompt
         ))}
         </div>
       )}
-      
-      {analysis?.verdict === 'BLOCK' && (
-        <div className="mt-4 p-3 rounded-lg bg-red-900/20 border border-red-500/30">
-          <p className="text-sm text-red-300 light:text-red-700">
-            ⚠️ Your previous prompt contained inappropriate content. Please use professional, educational, or creative prompts instead.
-          </p>
-        </div>
-      )}
     </motion.div>
   );
 };
