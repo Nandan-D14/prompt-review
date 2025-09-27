@@ -160,16 +160,16 @@ export const AnalysisPanel: React.FC = () => {
                 costarColors[key.toLowerCase() as keyof typeof costarColors] || 'bg-gray-500/20 text-gray-300'
               }`}
             >
-              {key}: {value}
+              {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
             </span>
           ))}
+        </div>
         </div>
       </motion.div>
 
       {/* Safety Log */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         className="glass-panel p-5 rounded-2xl shadow-xl"
       >
@@ -242,8 +242,12 @@ export const AnalysisPanel: React.FC = () => {
         </h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between items-center p-2 rounded-lg bg-gray-800/30 light:bg-gray-200/30">
-            <span className="truncate">"Previous analysis..."</span>
-            <span className="text-amber-400 text-xs">{analysis.score}</span>
+            <span className="truncate">"Get user data..."</span>
+            <span className="text-amber-400 text-xs">42</span>
+          </div>
+          <div className="flex justify-between items-center p-2 rounded-lg bg-gray-800/30 light:bg-gray-200/30">
+            <span className="truncate">"Create marketing..."</span>
+            <span className="text-green-400 text-xs">85</span>
           </div>
         </div>
       </motion.div>

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Mic, Paperclip, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAnalysis } from '../contexts/AnalysisContext';
+import { promptApi } from '../services/api';
 
 interface Message {
   id: string;
@@ -10,6 +12,7 @@ interface Message {
 }
 
 export const ChatArea: React.FC = () => {
+  const { setAnalysis, setIsLoading, setError } = useAnalysis();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -32,20 +35,64 @@ export const ChatArea: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentPrompt = inputValue;
     setInputValue('');
     setIsTyping(true);
+    setIsLoading(true);
+    setError(null);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Call the real backend API for chat
+      const chatResponse = await promptApi.chat({
+        prompt: currentPrompt,
+        persona: 'Professor'
+      });
+
+      // Update the analysis context with the results
+      setAnalysis(chatResponse.analysis);
+      
+      // Create assistant response based on the API result
+      let assistantContent = '';
+      if (chatResponse.allowed && chatResponse.llm_response) {
+        assistantContent = chatResponse.llm_response;
+      } else {
+        const verdict = chatResponse.analysis.verdict;
+        const score = chatResponse.analysis.score;
+        const issueCount = chatResponse.analysis.highlights.length;
+        
+        assistantContent = `I've analyzed your prompt and found ${issueCount} potential ${issueCount === 1 ? 'issue' : 'issues'}. ` +
+          `Verdict: **${verdict.replace('_', ' ')}** (Score: ${score}/100). ` +
+          `${verdict === 'BLOCK' ? 'This prompt contains critical safety issues and cannot be processed.' : 
+            verdict === 'NEEDS_FIX' ? 'This prompt has some issues that should be addressed. Check the analysis panel for suggestions.' : 
+            'This prompt looks good!'} ` +
+          `See the detailed analysis and suggested improvements in the analysis panel.`;
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I've analyzed your prompt. It seems to contain some risky phrases and unprofessional language. I've highlighted the issues and provided a safer alternative in the analysis panel.",
+        content: assistantContent,
         timestamp: new Date(),
       };
+      
       setMessages(prev => [...prev, assistantMessage]);
+      
+    } catch (error) {
+      console.error('Chat API error:', error);
+      setError('Failed to analyze prompt. Please check your backend connection.');
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "Sorry, I'm having trouble analyzing your prompt right now. Please make sure the backend is running and try again.",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -82,9 +129,6 @@ export const ChatArea: React.FC = () => {
                   <div className="max-w-md">
                     <div className="glass-panel p-4 rounded-xl rounded-bl-none">
                       <p className="text-base">{message.content}</p>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-800/40 light:bg-gray-200/40 rounded">
-                      <b>Analysis:</b> Detected high-risk phrase & slang. Score: 42. Suggesting rewrite.
                     </div>
                   </div>
                 </>
