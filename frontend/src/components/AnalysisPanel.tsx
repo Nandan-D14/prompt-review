@@ -1,16 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle, XCircle, Star, Sparkles, RefreshCw, Brain } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Star, Sparkles, RefreshCw, Brain, Check } from 'lucide-react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 
 export const AnalysisPanel: React.FC = () => {
-  const { analysis, isLoading, error } = useAnalysis();
+  const { analysis, isLoading, error, applyRewrite } = useAnalysis();
+  const [rewriteSuccess, setRewriteSuccess] = useState<string | null>(null);
 
-  const handleRewrite = async () => {
+  const handleRewrite = async (mode: 'normal' | 'rap' | 'poem' | 'meme' = 'normal') => {
     if (!analysis) return;
+    
     try {
-      // Call the rewrite API or use the suggested rewrite from analysis
-      console.log('Using suggested rewrite:', analysis.suggested_rewrite);
+      let rewrittenText = analysis.suggested_rewrite;
+      
+      if (mode !== 'normal') {
+        // For fun modes, create simple variations of the safe rewrite
+        const baseRewrite = analysis.suggested_rewrite;
+        
+        switch (mode) {
+          case 'rap':
+            rewrittenText = `Yo, could you break down ${baseRewrite.toLowerCase().replace('could you help me', '').replace('?', '')} in a fresh way?`;
+            break;
+          case 'poem':
+            rewrittenText = `Please explain with eloquence and grace, ${baseRewrite.toLowerCase().replace('could you help me', '').replace('?', '')}, in this academic space.`;
+            break;
+          case 'meme':
+            rewrittenText = `Help me understand ${baseRewrite.toLowerCase().replace('could you help me', '').replace('?', '')} - make it clear and fun! 😊`;
+            break;
+          default:
+            rewrittenText = baseRewrite;
+        }
+      }
+      
+      // Apply the rewrite to the input field
+      applyRewrite(rewrittenText);
+      
+      // Show success feedback
+      setRewriteSuccess(mode === 'normal' ? 'Rewrite applied!' : `${mode.charAt(0).toUpperCase() + mode.slice(1)} version applied!`);
+      setTimeout(() => setRewriteSuccess(null), 3000); // Clear after 3 seconds
+      
+      console.log(`${mode} rewrite applied successfully:`, rewrittenText);
     } catch (error) {
       console.error('Rewrite failed:', error);
     }
@@ -208,23 +237,45 @@ export const AnalysisPanel: React.FC = () => {
           {analysis.suggested_rewrite}
         </p>
         <button 
-          onClick={handleRewrite}
+          onClick={() => handleRewrite('normal')}
           className="mt-4 w-full bg-indigo-600/80 text-white font-semibold py-2 rounded-lg hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
           Use Fixed Version
         </button>
         
+        {/* Success feedback */}
+        {rewriteSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-3 p-2 rounded-lg bg-green-500/20 border border-green-500/50 flex items-center gap-2"
+          >
+            <Check className="w-4 h-4 text-green-400" />
+            <span className="text-green-400 text-sm">{rewriteSuccess}</span>
+          </motion.div>
+        )}
+        
         {/* Fun mode toggle */}
         <div className="mt-4 flex gap-2">
-          <button className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors">
+          <button 
+            onClick={() => handleRewrite('rap')}
+            className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors"
+          >
             <Sparkles className="w-3 h-3 inline mr-1" />
             Rap Mode
           </button>
-          <button className="text-xs px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 transition-colors">
+          <button 
+            onClick={() => handleRewrite('poem')}
+            className="text-xs px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 transition-colors"
+          >
             Poem Mode
           </button>
-          <button className="text-xs px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-colors">
+          <button 
+            onClick={() => handleRewrite('meme')}
+            className="text-xs px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-colors"
+          >
             Meme Mode
           </button>
         </div>

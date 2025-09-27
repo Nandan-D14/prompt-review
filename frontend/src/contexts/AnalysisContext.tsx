@@ -8,6 +8,9 @@ interface AnalysisContextType {
   setIsLoading: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
+  applyRewrite: (rewrittenText: string) => void;
+  onRewriteApplied?: (rewrittenText: string) => void;
+  setOnRewriteApplied: (callback: (rewrittenText: string) => void) => void;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -28,6 +31,13 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onRewriteApplied, setOnRewriteApplied] = useState<((rewrittenText: string) => void) | undefined>();
+
+  const applyRewrite = (rewrittenText: string) => {
+    if (onRewriteApplied) {
+      onRewriteApplied(rewrittenText);
+    }
+  };
 
   const value = {
     analysis,
@@ -36,6 +46,9 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     setIsLoading,
     error,
     setError,
+    applyRewrite,
+    onRewriteApplied,
+    setOnRewriteApplied,
   };
 
   return (

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mic, Paperclip, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import { promptApi } from '../services/api';
+import { RecommendedPrompts } from './RecommendedPrompts';
 
 interface Message {
   id: string;
@@ -12,7 +13,7 @@ interface Message {
 }
 
 export const ChatArea: React.FC = () => {
-  const { setAnalysis, setIsLoading, setError } = useAnalysis();
+  const { setAnalysis, setIsLoading, setError, setOnRewriteApplied } = useAnalysis();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -21,11 +22,20 @@ export const ChatArea: React.FC = () => {
       timestamp: new Date(),
     }
   ]);
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [inputValue, setInputValue] = useState<string>('');
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+
+  // Register rewrite callback
+  useEffect(() => {
+    setOnRewriteApplied((rewrittenText: string) => {
+      if (rewrittenText && typeof rewrittenText === 'string') {
+        setInputValue(rewrittenText);
+      }
+    });
+  }, [setOnRewriteApplied]);
 
   const handleSubmit = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue || !inputValue.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -102,6 +112,10 @@ export const ChatArea: React.FC = () => {
     }
   };
 
+  const handlePromptSelect = (prompt: string) => {
+    setInputValue(prompt);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-gray-700/50 light:border-gray-300/50 flex-shrink-0">
@@ -168,35 +182,39 @@ export const ChatArea: React.FC = () => {
         </AnimatePresence>
       </div>
       
-      <div className="p-4 border-t border-gray-700/50 light:border-gray-300/50 flex-shrink-0">
-        <div className="glass-panel p-2 rounded-xl">
-          <textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="w-full bg-transparent dark:text-white light:text-black placeholder-gray-400 text-base resize-none focus:outline-none p-2"
-            rows={2}
-            placeholder="Enter your prompt..."
-          />
-          <div className="flex justify-between items-center mt-2 px-2">
-            <div className="flex items-center gap-1">
-              <button className="p-2 rounded-full dark:hover:bg-gray-700/50 light:hover:bg-gray-300/50 transition-colors">
-                <Mic className="w-5 h-5 text-gray-400" />
-              </button>
-              <button className="p-2 rounded-full dark:hover:bg-gray-700/50 light:hover:bg-gray-300/50 transition-colors">
-                <Paperclip className="w-5 h-5 text-gray-400" />
+      <div className="border-t border-gray-700/50 light:border-gray-300/50 flex-shrink-0">
+        <div className="p-4">
+          <div className="glass-panel p-2 rounded-xl">
+            <textarea
+              value={inputValue || ''}
+              onChange={(e) => setInputValue(e.target.value || '')}
+              onKeyPress={handleKeyPress}
+              className="w-full bg-transparent dark:text-white light:text-black placeholder-gray-400 text-base resize-none focus:outline-none p-2"
+              rows={2}
+              placeholder="Enter your prompt..."
+            />
+            <div className="flex justify-between items-center mt-2 px-2">
+              <div className="flex items-center gap-1">
+                <button className="p-2 rounded-full dark:hover:bg-gray-700/50 light:hover:bg-gray-300/50 transition-colors">
+                  <Mic className="w-5 h-5 text-gray-400" />
+                </button>
+                <button className="p-2 rounded-full dark:hover:bg-gray-700/50 light:hover:bg-gray-300/50 transition-colors">
+                  <Paperclip className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={!inputValue || !inputValue.trim()}
+                className="bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg shadow-md hover:bg-indigo-500 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                Submit
               </button>
             </div>
-            <button
-              onClick={handleSubmit}
-              disabled={!inputValue.trim()}
-              className="bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg shadow-md hover:bg-indigo-500 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Submit
-            </button>
           </div>
         </div>
+        
+        <RecommendedPrompts onPromptSelect={handlePromptSelect} />
       </div>
     </div>
   );

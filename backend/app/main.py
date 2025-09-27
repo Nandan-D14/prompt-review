@@ -20,7 +20,7 @@ GEMINI_ENDPOINT = os.getenv("GEMINI_API_URL", "https://generativelanguage.google
 USE_STUB = os.getenv("USE_STUB", "false").lower() in ("1", "true", "yes")
 
 # Simple slang and suspicious patterns (extend for hackathon)
-COMMON_SLANG = {"oi", "bruh", "wtf", "wanna", "gonna", "sus", "lol", "yeet", "slay", "fire", "bet"}
+COMMON_SLANG = {"oi", "bruh", "wtf", "wanna", "gonna", "sus", "lol", "yeet", "slay", "fire", "bet", "fuck", "fucking", "shit", "damn"}
 # a few Kannada Unicode words example: (you can extend)
 KANNADA_UNICODE_REGEX = re.compile(r"[\u0C80-\u0CFF]")
 
@@ -37,14 +37,39 @@ INJECTION_PATTERNS = [
     r"act as if you are not an ai",
 ]
 
+# Explicit content patterns (strict filtering)
+EXPLICIT_PATTERNS = [
+    r"\bf+u+c+k+\b",
+    r"\bs+e+x+\b", 
+    r"\bp+o+r+n+\b",
+    r"\bn+u+d+e+\b",
+    r"\bg+i+r+l+s?\s+.*(hard|fuck|sex)",
+    r"hard.*fuck.*with.*\d+.*girls?",
+    r"\b(sexual|erotic|xxx|adult)\b",
+    r"\b(prostitut|escort|hookup)\b",
+    r"\b(masturbat|orgasm|climax)\b",
+    r"\b(penis|vagina|breast|ass|dick|cock|pussy)\b",
+    r"want.*to.*(fuck|have sex|sleep with)",
+    r"looking for.*(sex|hookup|adult fun)",
+]
+
+# Violent/harmful content patterns
+HARMFUL_PATTERNS = [
+    r"\b(kill|murder|suicide|self.?harm)\b",
+    r"\b(bomb|explosive|weapon|gun)\b",
+    r"\b(drug|cocaine|heroin|meth)\b",
+    r"how to (hurt|harm|attack|assault)",
+    r"ways to (die|kill|harm)",
+]
+
 app = FastAPI(title="Prompt Review Engine - Backend")
 
 # Allow CORS from localhost/frontend (adjust for deploy)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:5174", "*"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177", "http://localhost:5178", "*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -85,13 +110,25 @@ def detect_slang_and_ambiguity(text: str) -> t.List[dict]:
     findings = []
     for w in words:
         if w in COMMON_SLANG:
-            findings.append({"type":"slang","token":w,"reason":"common_slang"})
+            findings.append({"type":"slang","token":w,"reason":"inappropriate_language"})
+    
+    # Check for explicit content
+    for pattern in EXPLICIT_PATTERNS:
+        if re.search(pattern, text, re.I):
+            findings.append({"type":"explicit","token":"[BLOCKED]","reason":"sexual_or_explicit_content"})
+    
+    # Check for harmful content
+    for pattern in HARMFUL_PATTERNS:
+        if re.search(pattern, text, re.I):
+            findings.append({"type":"harmful","token":"[BLOCKED]","reason":"violent_or_harmful_content"})
+    
     # double-meaning heuristics: presence of "hack" + "how to" etc.
     if re.search(r"\bhack\b", text, re.I):
-        findings.append({"type":"risky","token":"hack","reason":"potential illicit intent"})
+        findings.append({"type":"risky","token":"hack","reason":"potential_illicit_intent"})
     # ambiguous question like "is it ok to..." - low confidence marker
     if re.search(r"\bis it ok to\b", text, re.I):
-        findings.append({"type":"ambiguous","token":"is it ok to","reason":"ambiguous intent"})
+        findings.append({"type":"ambiguous","token":"is it ok to","reason":"ambiguous_intent"})
+    
     return findings
 
 def detect_injection(text: str) -> t.List[dict]:
@@ -164,22 +201,64 @@ def compute_score(issues: int, costar: dict) -> int:
         score -= 5
     return max(0, min(100, score))
 
-def decide_verdict(issues_count: int, injection_found: bool) -> str:
+def decide_verdict(issues_count: int, injection_found: bool, highlights: t.List[dict]) -> str:
+    # Check for explicit or harmful content - always BLOCK
+    for highlight in highlights:
+        if highlight.get("type") in ["explicit", "harmful"]:
+            return "BLOCK"
+    
+    # Check for injection attacks
     if injection_found:
         return "BLOCK"
+    
+    # Check for multiple slang words - stricter enforcement
+    slang_count = sum(1 for h in highlights if h.get("type") == "slang")
+    if slang_count >= 2:  # Multiple profanity words = BLOCK
+        return "BLOCK"
+        
     if issues_count == 0:
         return "ALLOW"
-    if issues_count <= 2:
+    if issues_count <= 1:
         return "NEEDS_FIX"
     return "BLOCK"
 
 def build_sanitized_rewrite(prompt: str, costar: dict, persona: str) -> str:
-    # Use a short heuristic rewrite as fallback; ideally we call Gemini for polished rewrite.
-    # Keep it concise and safe.
+    # For inappropriate content, provide completely different professional prompts
+    # Never try to sanitize explicit/harmful content - replace entirely
+    
+    # Check if original prompt contains explicit or harmful content
+    contains_explicit = any(re.search(pattern, prompt, re.I) for pattern in EXPLICIT_PATTERNS)
+    contains_harmful = any(re.search(pattern, prompt, re.I) for pattern in HARMFUL_PATTERNS)
+    contains_profanity = any(word in prompt.lower() for word in COMMON_SLANG if word in ['fuck', 'fucking', 'shit', 'damn'])
+    
+    if contains_explicit or contains_harmful or contains_profanity:
+        # Return professional alternatives based on persona
+        if persona == "Professor":
+            return "Could you help me understand a complex topic in a clear and educational way?"
+        elif persona == "Guardian":
+            return "I'd like guidance on making responsible and ethical decisions."
+        else:  # Shield
+            return "Please provide information about best practices for online safety and security."
+    
+    # For non-explicit content, do light sanitization
     base = prompt
-    # simple replacements
-    base = re.sub(r"\bhack\b", "discuss security risks around", base, flags=re.I)
-    base = re.sub(r"\bpassword\b", "authentication methods", base, flags=re.I)
+    base = re.sub(r"\bhack\b", "learn about cybersecurity concepts related to", base, flags=re.I)
+    base = re.sub(r"\bpassword\b", "authentication security regarding", base, flags=re.I)
+    base = re.sub(r"\bcrack\b", "understand the security of", base, flags=re.I)
+    base = re.sub(r"\bsteal\b", "learn about protecting", base, flags=re.I)
+    
+    # Remove any remaining slang
+    for word in COMMON_SLANG:
+        if word not in ['fuck', 'fucking', 'shit', 'damn']:  # These should trigger full replacement above
+            base = re.sub(r"\b" + re.escape(word) + r"\b", "", base, flags=re.I)
+    
+    # Clean up extra spaces
+    base = re.sub(r'\s+', ' ', base).strip()
+    
+    # If result is too short or empty, provide default
+    if len(base) < 10:
+        return "Could you help me with a professional and educational request?"
+    
     return base
 
 # --- Gemini client (simple wrapper) ---
@@ -276,23 +355,40 @@ def analyze(req: AnalyzeRequest):
     # Score & verdict
     issues_count = len(highlights)
     score = compute_score(issues_count, costar)
-    verdict = decide_verdict(issues_count, injection_found)
+    verdict = decide_verdict(issues_count, injection_found, highlights)
 
-    # Suggested rewrite (call Gemini if available, else simple fallback)
+    # Suggested rewrite (always use safe fallback for inappropriate content)
     suggested_rewrite = ""
-    # Try to get a nicer rewrite from Gemini
-    rewrite_prompt = (
-        f"Rewrite the following user prompt to be safe, professional, and aligned with COSTAR.\n"
-        f"Original prompt: '''{prompt}'''\n"
-        f"COSTAR: {json.dumps(costar)}\n"
-        f"Persona: {persona}\n"
-        f"Provide only the sanitized prompt (one short paragraph)."
-    )
-    suggested_rewrite = call_gemini_generate(rewrite_prompt, max_tokens=256)
-
-    # If gemini returned stub or empty, fallback
-    if not suggested_rewrite or suggested_rewrite.startswith("STUB LLM RESPONSE"):
+    
+    # Check if content is inappropriate - if so, skip Gemini and use safe fallback
+    contains_inappropriate = any([
+        any(re.search(pattern, prompt, re.I) for pattern in EXPLICIT_PATTERNS),
+        any(re.search(pattern, prompt, re.I) for pattern in HARMFUL_PATTERNS),
+        any(word in prompt.lower() for word in COMMON_SLANG if word in ['fuck', 'fucking', 'shit', 'damn'])
+    ])
+    
+    if contains_inappropriate or verdict == "BLOCK":
+        # For blocked content, always use safe local rewrite
         suggested_rewrite = build_sanitized_rewrite(prompt, costar, persona)
+    else:
+        # Only call Gemini for appropriate content
+        try:
+            rewrite_prompt = (
+                f"Rewrite the following user prompt to be more professional and clear.\n"
+                f"Original prompt: '''{prompt}'''\n"
+                f"Persona: {persona}\n"
+                f"Provide only a clean, professional version (one sentence)."
+            )
+            suggested_rewrite = call_gemini_generate(rewrite_prompt, max_tokens=256)
+
+            # If gemini returned stub, empty, or malformed JSON, fallback
+            if (not suggested_rewrite or 
+                suggested_rewrite.startswith("STUB LLM RESPONSE") or 
+                suggested_rewrite.startswith("{") or
+                len(suggested_rewrite) > 200):
+                suggested_rewrite = build_sanitized_rewrite(prompt, costar, persona)
+        except:
+            suggested_rewrite = build_sanitized_rewrite(prompt, costar, persona)
 
     return AnalyzeResponse(
         verdict=verdict,
