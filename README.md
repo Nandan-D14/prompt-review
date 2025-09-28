@@ -260,7 +260,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For questions or support, please open an issue on GitHub or contact the maintainers.
 
 ---
-
-**Live Demo**: [GitHub Repository](https://github.com/Nandan-D14/prompt-review)
-**Backend API**: http://localhost:8000/docs
-**Frontend**: http://localhost:5173
