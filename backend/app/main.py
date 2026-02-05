@@ -106,7 +106,7 @@ def detect_mixed_language(text: str) -> dict:
     return {"has_kannada": has_kannada}
 
 def detect_slang_and_ambiguity(text: str) -> t.List[dict]:
-    words = re.findall(r"\w+['']?\w*|\S+", text.lower())
+    words = re.findall(r"\b\w+\b", text.lower())
     findings = []
     for w in words:
         if w in COMMON_SLANG:
